@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Single-Leg Arm Reach (Right) Coach</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030d18;--panel:rgba(3,15,28,0.92);--border:rgba(0,200,255,0.18);--green:#00ff88;--orange:#ff8c00;--red:#ff3333;--cyan:#00e5ff;--dim:rgba(120,200,180,0.6);--font:'Courier New',monospace}
+body{background:var(--bg);font-family:var(--font);overflow:hidden;width:100vw;height:100vh;color:#b0f0d0}
+#canvas{position:fixed;inset:0;width:100%;height:100%}
+#scanlines{position:fixed;inset:0;pointer-events:none;z-index:2;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 6px)}
+#ui{position:fixed;inset:0;z-index:10;pointer-events:none}
+#header{position:absolute;top:0;left:0;right:0;padding:12px 20px 14px;background:linear-gradient(180deg,rgba(3,13,24,0.95) 0%,transparent 100%);display:flex;flex-direction:column;align-items:center;gap:10px}
+.app-title{font-size:13px;letter-spacing:6px;color:var(--cyan);text-shadow:0 0 16px rgba(0,229,255,0.5);text-transform:uppercase}
+#steps-bar{display:flex;gap:8px;align-items:center}
+.step-bubble{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(0,200,255,0.2);background:rgba(0,20,40,0.7);font-size:13px;transition:all 0.4s;position:relative}
+.step-bubble.done{background:rgba(0,255,136,0.15);border-color:var(--green);box-shadow:0 0 12px rgba(0,255,136,0.3)}
+.step-bubble.active{background:rgba(0,229,255,0.15);border-color:var(--cyan);box-shadow:0 0 18px rgba(0,229,255,0.4);transform:scale(1.12)}
+.step-bubble.active::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(0,229,255,0.3);animation:pulse-ring 1.4s ease-out infinite}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:0.8}100%{transform:scale(1.5);opacity:0}}
+.step-connector{width:22px;height:1px;background:rgba(0,200,255,0.15);transition:background 0.4s}
+.step-connector.done{background:rgba(0,255,136,0.4)}
+#step-card{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);width:min(600px,90vw);background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px 24px 14px;backdrop-filter:blur(14px);text-align:center}
+.step-num{font-size:10px;letter-spacing:4px;color:var(--dim);margin-bottom:6px;text-transform:uppercase}
+.step-icon{font-size:28px;margin-bottom:6px;display:block}
+.step-title{font-size:19px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);text-shadow:0 0 14px rgba(0,229,255,0.5);margin-bottom:6px}
+.step-desc{font-size:12px;letter-spacing:1.5px;color:var(--dim);margin-bottom:12px;line-height:1.6}
+.hold-bar-bg{width:100%;height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden}
+.hold-bar-fill{height:100%;border-radius:3px;background:var(--cyan);width:0%;transition:width 0.1s linear,background 0.3s;box-shadow:0 0 8px var(--cyan)}
+.hold-label{font-size:9px;letter-spacing:3px;color:var(--dim);margin-top:6px;text-transform:uppercase}
+#complete-card{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);width:min(600px,90vw);background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.35);border-radius:16px;padding:24px;text-align:center;backdrop-filter:blur(14px);display:none}
+.complete-star{font-size:52px;animation:star-spin 4s ease-in-out infinite}
+@keyframes star-spin{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.1) rotate(3deg)}}
+.complete-title{font-size:22px;font-weight:bold;letter-spacing:5px;color:var(--green);text-shadow:0 0 24px rgba(0,255,136,0.6);margin:8px 0 4px;text-transform:uppercase}
+.complete-sub{font-size:11px;letter-spacing:3px;color:var(--dim)}
+#scores{position:absolute;top:96px;left:14px;width:146px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;backdrop-filter:blur(12px)}
+.scores-title{font-size:9px;letter-spacing:4px;color:var(--dim);margin-bottom:10px;text-transform:uppercase}
+.sc-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.sc-name{font-size:10px;color:var(--dim);width:38px;flex-shrink:0;letter-spacing:1px}
+.sc-bar{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+.sc-fill{height:100%;border-radius:2px;transition:width 0.3s,background 0.3s;width:0%}
+.sc-val{font-size:11px;font-weight:bold;width:24px;text-align:right;flex-shrink:0}
+#total-score{margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,200,255,0.1);text-align:center}
+#total-num{font-size:46px;font-weight:bold;line-height:1;transition:color 0.3s,text-shadow 0.3s;color:var(--cyan);text-shadow:0 0 24px var(--cyan)}
+#total-lbl{font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase}
+#voice-bar{position:absolute;top:96px;right:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;backdrop-filter:blur(12px);text-align:center;min-width:120px}
+.vb-label{font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+#voice-status{font-size:11px;letter-spacing:2px;color:var(--cyan);text-shadow:0 0 10px var(--cyan);margin-bottom:10px}
+#voice-waves{display:flex;gap:4px;justify-content:center;align-items:flex-end;height:24px;margin-bottom:10px}
+.wave-bar{width:4px;border-radius:2px;background:var(--cyan);opacity:0.3;transition:opacity 0.3s}
+.wave-bar.active{opacity:1;animation:wave 0.8s ease-in-out infinite}
+.wave-bar:nth-child(2){animation-delay:0.1s}.wave-bar:nth-child(3){animation-delay:0.2s}.wave-bar:nth-child(4){animation-delay:0.3s}.wave-bar:nth-child(5){animation-delay:0.15s}
+@keyframes wave{0%,100%{height:4px}50%{height:20px}}
+#controls{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:all}
+.ctrl-btn{background:var(--panel);border:1px solid var(--border);color:var(--cyan);padding:8px 16px;border-radius:20px;cursor:pointer;font-family:var(--font);font-size:10px;letter-spacing:2px;text-transform:uppercase;transition:all 0.2s;backdrop-filter:blur(10px)}
+.ctrl-btn:hover{background:rgba(0,229,255,0.12);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,0.2)}
+.ctrl-btn.muted{color:rgba(0,229,255,0.35);border-color:rgba(0,200,255,0.1)}
+#loading{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity 0.6s}
+.load-title{font-size:24px;letter-spacing:6px;color:var(--cyan);text-shadow:0 0 30px rgba(0,229,255,0.5);text-transform:uppercase}
+.load-sub{font-size:10px;letter-spacing:5px;color:var(--dim);text-transform:uppercase}
+.load-track{width:240px;height:2px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden}
+.load-fill{height:100%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);border-radius:1px;animation:loading-anim 3s ease-in-out forwards}
+@keyframes loading-anim{0%{width:0%}40%{width:55%}80%{width:82%}}
+.load-msg{font-size:10px;letter-spacing:3px;color:var(--dim);animation:blink 1.4s ease-in-out infinite;text-transform:uppercase}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+#error-box{position:fixed;inset:0;background:rgba(3,13,24,0.95);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+.err-title{font-size:18px;letter-spacing:4px;color:#ff4455;text-transform:uppercase}
+.err-msg{font-size:12px;letter-spacing:1.5px;color:var(--dim);max-width:400px;line-height:1.8}
+.err-steps{font-size:11px;color:var(--dim);text-align:left;line-height:2;max-width:380px}
+#no-pose{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0;transition:opacity 0.4s}
+.np-text{font-size:11px;letter-spacing:4px;color:rgba(120,200,180,0.35);text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-title">⬡ Arm Reach</div>
+  <div class="load-sub">AI Posture Coach</div>
+  <div class="load-track"><div class="load-fill"></div></div>
+  <div class="load-msg" id="load-msg">Loading AI model...</div>
+</div>
+
+<div id="error-box">
+  <div class="err-title">⚠ Cannot Start</div>
+  <div class="err-msg" id="err-msg">Camera access was denied.</div>
+  <div class="err-steps">To fix:<br>1. Open in Chrome or Edge<br>2. Allow camera in address bar<br>3. Refresh</div>
+</div>
+
+<canvas id="canvas"></canvas>
+<div id="scanlines"></div>
+
+<div id="ui">
+  <div id="header">
+    <div class="app-title">⬡ YogaVision — Single-Leg Balance + Arm Reach (Right)</div>
+    <div id="steps-bar"></div>
+  </div>
+
+  <div id="scores">
+    <div class="scores-title">Scores</div>
+    <div class="sc-row"><span class="sc-name">LEG</span><div class="sc-bar"><div class="sc-fill" id="sc-feet"></div></div><span class="sc-val" id="sv-feet">0</span></div>
+    <div class="sc-row"><span class="sc-name">KNEE</span><div class="sc-bar"><div class="sc-fill" id="sc-knees"></div></div><span class="sc-val" id="sv-knees">0</span></div>
+    <div class="sc-row"><span class="sc-name">ARM</span><div class="sc-bar"><div class="sc-fill" id="sc-hands"></div></div><span class="sc-val" id="sv-hands">0</span></div>
+    <div id="total-score">
+      <div id="total-num">--</div>
+      <div id="total-lbl">Total</div>
+    </div>
+  </div>
+
+  <div id="voice-bar">
+    <div class="vb-label">Voice Coach</div>
+    <div id="voice-status">READY</div>
+    <div id="voice-waves">
+      <div class="wave-bar" style="height:6px"></div>
+      <div class="wave-bar" style="height:14px"></div>
+      <div class="wave-bar" style="height:20px"></div>
+      <div class="wave-bar" style="height:14px"></div>
+      <div class="wave-bar" style="height:8px"></div>
+    </div>
+  </div>
+
+  <div id="no-pose"><div class="np-text">Step into frame</div></div>
+
+  <div id="step-card">
+    <div class="step-num" id="card-num">Step 1 of 4</div>
+    <span class="step-icon" id="card-icon">🦵</span>
+    <div class="step-title" id="card-title">Right Leg Balance</div>
+    <div class="step-desc" id="card-desc">Stand on your right leg and straighten it.</div>
+    <div class="hold-bar-bg"><div class="hold-bar-fill" id="hold-fill"></div></div>
+    <div class="hold-label" id="hold-label">Hold steady to advance</div>
+  </div>
+
+  <div id="complete-card">
+    <div class="complete-star">🏆</div>
+    <div class="complete-title">Pose Locked!</div>
+    <div class="complete-sub">Right leg strong · Left knee up · Right arm reaching forward</div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-voice" onclick="toggleVoice()">🔊 Voice On</button>
+    <button class="ctrl-btn" onclick="repeatVoice()">↺ Repeat</button>
+    <button class="ctrl-btn" onclick="resetSteps()">⟳ Reset</button>
+    <button class="ctrl-btn" id="btn-ghost" onclick="toggleGhost()">◈ Ghost</button>
+    <button class="ctrl-btn" id="btn-focus" onclick="toggleFocus()">◉ Focus</button>
+  </div>
+</div>
+
+<video id="video" style="display:none" playsinline autoplay muted></video>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+/* ── LANDMARK MAP ── */
+const LM={
+  NOSE:0,
+  L_SHOULDER:11,R_SHOULDER:12,
+  L_ELBOW:13,   R_ELBOW:14,
+  L_WRIST:15,   R_WRIST:16,
+  L_HIP:23,     R_HIP:24,
+  L_KNEE:25,    R_KNEE:26,
+  L_ANKLE:27,   R_ANKLE:28,
+};
+
+/* ── MATH HELPERS ── */
+function calcAngle(A,B,C){
+  const r=Math.atan2(C.y-B.y,C.x-B.x)-Math.atan2(A.y-B.y,A.x-B.x);
+  const a=Math.abs(r*180/Math.PI);
+  return a>180?360-a:a;
+}
+function calcDist(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2)}
+
+/* ── VISIBILITY CHECK ── */
+function vis(lm,t=0.3){
+  if(!lm)return false;
+  return(lm.presence??1)>=0.2&&(lm.visibility??1)>=t&&lm.x>-0.05&&lm.x<1.05&&lm.y>-0.05&&lm.y<1.05;
+}
+
+function scoreFromAngle(val,idealLo,idealHi,margin=20){
+  if(val>=idealLo&&val<=idealHi)return 100;
+  const d=val<idealLo?idealLo-val:val-idealHi;
+  return Math.max(0,Math.round(100-(d/margin)*100));
+}
+
+/* ── POSE CHECK FUNCTIONS (exact as provided) ── */
+function checkRightLegStraight(lm){
+  if(!vis(lm[LM.R_HIP])||!vis(lm[LM.R_KNEE])||!vis(lm[LM.R_ANKLE]))return{pass:false,score:0};
+  const angle=calcAngle(lm[LM.R_HIP],lm[LM.R_KNEE],lm[LM.R_ANKLE]);
+  const pass=angle>155;
+  return{pass,score:scoreFromAngle(angle,165,180)};
+}
+
+function checkLeftKneeLift(lm){
+  if(!vis(lm[LM.L_KNEE])||!vis(lm[LM.L_HIP]))return{pass:false,score:0};
+  const pass=lm[LM.L_KNEE].y<lm[LM.L_HIP].y+0.05;
+  return{pass,score:80};
+}
+
+function checkRightArmForward(lm){
+  if(!vis(lm[LM.R_WRIST])||!vis(lm[LM.R_SHOULDER]))return{pass:false,score:0};
+  const wrist=lm[LM.R_WRIST],shoulder=lm[LM.R_SHOULDER];
+  const armLevel=wrist.y<shoulder.y+0.15;
+  const armExtend=Math.abs(wrist.x-shoulder.x)>0.05;
+  const pass=armLevel&&armExtend;
+  return{pass,score:pass?100:40};
+}
+
+/* ── STEPS ── */
+const STEPS=[
+  {
+    icon:'🦵',title:'Right Leg Balance',
+    desc:'Stand on your right leg and straighten it firmly.',
+    voice:'Welcome! Let\'s build the single-leg arm reach on the right. Start by standing on your right leg and straightening it.',
+    voiceAdvance:'Right leg is stable! Now lift your left knee up to hip level.',
+    corrective:'Keep your right leg straight.',
+    holdNeeded:25,check:checkRightLegStraight,
+  },
+  {
+    icon:'🏔',title:'Left Knee Lift',
+    desc:'Lift your left knee slightly — just up to hip level.',
+    voice:'Good! Now lift your left knee up. It just needs to reach hip level. Take your time and find your centre.',
+    voiceAdvance:'Left knee lifted! Now reach your right arm forward.',
+    corrective:'Raise your left knee up to hip level.',
+    holdNeeded:25,check:checkLeftKneeLift,
+  },
+  {
+    icon:'👉',title:'Right Arm Reach',
+    desc:'Extend your right arm forward at shoulder height.',
+    voice:'Almost there! Reach your right arm straight forward at shoulder height. Feel the full extension.',
+    voiceAdvance:'Perfect arm reach — pose locked!',
+    corrective:'Reach your right arm forward at shoulder height.',
+    holdNeeded:35,check:checkRightArmForward,
+  },
+  {
+    icon:'🏆',title:'Pose Locked!',
+    desc:'Hold — right leg grounded, left knee up, right arm reaching forward.',
+    voice:'Excellent! Full pose achieved. Right leg strong, left knee lifted, right arm reaching forward. Hold and breathe deeply.',
+    voiceAdvance:'',
+    corrective:'',
+    holdNeeded:60,
+    check:(lm)=>{
+      const r=[checkRightLegStraight(lm),checkLeftKneeLift(lm),checkRightArmForward(lm)];
+      return{pass:r.every(x=>x.pass),score:Math.round(r.reduce((a,b)=>a+b.score,0)/r.length)};
+    },
+  },
+];
+
+/*
+  GHOST SKELETON — canvas is mirrored (ctx scale -1,1 on x axis)
+  gC flips x: screen_x = (1 - landmark_x) * width
+  So to appear on RIGHT of screen → use LOW x values in G
+      to appear on LEFT  of screen → use HIGH x values in G
+
+  Pose: stand on RIGHT leg, LEFT knee raised, RIGHT arm extended forward
+  - Right leg (standing) → rKn, rAn at low x  → RIGHT side of screen ✓
+  - Left knee (raised)   → lKn, lAn at high x → LEFT side of screen ✓
+  - Right arm (forward)  → rEl, rWr pulled toward centre (low x)   ✓
+  - Left arm (relaxed)   → lEl, lWr hanging at high x              ✓
+*/
+const G={
+  nose:{x:.500,y:.075},
+  rSh:{x:.390,y:.235}, lSh:{x:.610,y:.235},
+  rEl:{x:.300,y:.232}, rWr:{x:.220,y:.230},  // right arm reaching forward (low x = right side)
+  lEl:{x:.690,y:.320}, lWr:{x:.710,y:.415},  // left arm relaxed down
+  rHp:{x:.420,y:.490}, lHp:{x:.575,y:.490},
+  rKn:{x:.415,y:.715}, rAn:{x:.412,y:.950},  // right leg straight & grounded
+  lKn:{x:.568,y:.355}, lAn:{x:.562,y:.278},  // left knee raised
+};
+const GBONES=[
+  ['nose','rSh'],['nose','lSh'],['rSh','lSh'],
+  ['rSh','rEl'],['rEl','rWr'],
+  ['lSh','lEl'],['lEl','lWr'],
+  ['rSh','rHp'],['lSh','lHp'],['rHp','lHp'],
+  ['rHp','rKn'],['rKn','rAn'],
+  ['lHp','lKn'],['lKn','lAn'],
+];
+
+/* ── STATE ── */
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const video=document.getElementById('video');
+let currentStep=0,holdFrames=0,completed=false;
+let voiceEnabled=true,showGhost=true,focusMode=true;
+let lastSpoken='',lastCorrectiveTime=0;
+
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+
+/* ── VOICE ── */
+const synth=window.speechSynthesis;
+function speak(text,force=false){
+  if(!voiceEnabled)return;
+  if(text===lastSpoken&&!force)return;
+  lastSpoken=text;synth.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=0.88;u.pitch=1.05;u.volume=1;
+  u.onstart=()=>{setWaves(true);setVS('SPEAKING')};
+  u.onend=()=>{setWaves(false);setVS('LISTENING')};
+  u.onerror=()=>{setWaves(false);setVS('READY')};
+  synth.speak(u);
+}
+function setWaves(on){document.querySelectorAll('.wave-bar').forEach(w=>on?w.classList.add('active'):w.classList.remove('active'))}
+function setVS(t){document.getElementById('voice-status').textContent=t}
+function toggleVoice(){
+  voiceEnabled=!voiceEnabled;
+  const b=document.getElementById('btn-voice');
+  if(voiceEnabled){b.textContent='🔊 Voice On';b.classList.remove('muted');setVS('READY')}
+  else{synth.cancel();b.textContent='🔇 Voice Off';b.classList.add('muted');setWaves(false);setVS('MUTED')}
+}
+function repeatVoice(){if(currentStep<STEPS.length)speak(STEPS[currentStep].voice,true)}
+function toggleGhost(){showGhost=!showGhost;document.getElementById('btn-ghost').classList.toggle('muted',!showGhost)}
+function toggleFocus(){focusMode=!focusMode;document.getElementById('btn-focus').classList.toggle('muted',!focusMode)}
+function maybeCorrect(text){
+  const now=Date.now();
+  if(text&&now-lastCorrectiveTime>5000){lastCorrectiveTime=now;speak(text,true)}
+}
+function resetSteps(){
+  currentStep=0;holdFrames=0;completed=false;lastSpoken='';
+  document.getElementById('complete-card').style.display='none';
+  document.getElementById('step-card').style.display='block';
+  updateStepCard(0);buildBubbles();speak(STEPS[0].voice,true);
+}
+
+/* ── BUBBLES ── */
+function buildBubbles(){
+  const bar=document.getElementById('steps-bar');bar.innerHTML='';
+  STEPS.forEach((s,i)=>{
+    if(i>0){const c=document.createElement('div');c.className='step-connector'+(i<=currentStep?' done':'');c.id=`conn-${i}`;bar.appendChild(c)}
+    const b=document.createElement('div');
+    b.className='step-bubble'+(i<currentStep?' done':i===currentStep?' active':'');
+    b.id=`bub-${i}`;b.textContent=i<currentStep?'✓':s.icon;bar.appendChild(b);
+  });
+}
+function updateBubbles(){
+  STEPS.forEach((s,i)=>{
+    const b=document.getElementById(`bub-${i}`);if(!b)return;
+    b.className='step-bubble'+(i<currentStep?' done':i===currentStep?' active':'');
+    b.textContent=i<currentStep?'✓':s.icon;
+    if(i>0){const c=document.getElementById(`conn-${i}`);if(c)c.className='step-connector'+(i<=currentStep?' done':'')}
+  });
+}
+function updateStepCard(idx){
+  const s=STEPS[idx];
+  document.getElementById('card-num').textContent=`Step ${idx+1} of ${STEPS.length}`;
+  document.getElementById('card-icon').textContent=s.icon;
+  document.getElementById('card-title').textContent=s.title;
+  document.getElementById('card-desc').textContent=s.desc;
+  document.getElementById('hold-fill').style.width='0%';
+  document.getElementById('hold-label').textContent=idx===STEPS.length-1?'Hold this pose!':'Hold steady to advance';
+}
+
+/* ── AURA ── */
+function auraColor(s){return s<50?'#ff3333':s<80?'#ff8c00':'#00ff88'}
+
+/* ── COMPUTE SCORES ── */
+function computeScores(lm){
+  const leg=checkRightLegStraight(lm).score;
+  const knee=checkLeftKneeLift(lm).score;
+  const arm=checkRightArmForward(lm).score;
+  const total=Math.round((leg+knee+arm)/3);
+  return{feet:leg,knees:knee,hands:arm,total};
+}
+
+/* ── UPDATE SCORE PANEL ── */
+function updateScorePanel(sc){
+  if(!sc){
+    ['feet','knees','hands'].forEach(k=>{document.getElementById(`sc-${k}`).style.width='0%';document.getElementById(`sv-${k}`).textContent='0'});
+    document.getElementById('total-num').textContent='--';return;
+  }
+  const col=auraColor(sc.total);
+  for(const[k,v]of[['feet',sc.feet],['knees',sc.knees],['hands',sc.hands]]){
+    const f=document.getElementById(`sc-${k}`);f.style.width=v+'%';f.style.background=col;
+    const sv=document.getElementById(`sv-${k}`);sv.style.color=col;sv.textContent=v;
+  }
+  const tn=document.getElementById('total-num');
+  tn.textContent=sc.total;tn.style.color=col;tn.style.textShadow=`0 0 24px ${col}`;
+}
+
+/* ── HIGHLIGHT JOINTS per step ── */
+function drawHighlight(lm,stepIdx){
+  const map=[
+    [LM.R_HIP,LM.R_KNEE,LM.R_ANKLE],          // step 0: right leg
+    [LM.L_KNEE,LM.L_HIP],                       // step 1: left knee
+    [LM.R_SHOULDER,LM.R_ELBOW,LM.R_WRIST],      // step 2: right arm
+    [],
+  ];
+  const joints=map[stepIdx]||[];if(!joints.length)return;
+  const t=Date.now()/600,ring=14+Math.sin(t)*5;
+  ctx.save();
+  ctx.strokeStyle='#00e5ff';ctx.lineWidth=2.5;ctx.shadowBlur=12;ctx.shadowColor='#00e5ff';
+  ctx.globalAlpha=0.7+Math.sin(t)*0.3;
+  for(const idx of joints){
+    const l=lm[idx];if(!l||(l.visibility??1)<0.4)continue;
+    const p=lC(l);ctx.beginPath();ctx.arc(p.x,p.y,ring,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ── COORDS (mirrored) ── */
+function lC(p){return{x:(1-p.x)*canvas.width,y:p.y*canvas.height}}
+function gC(p){return{x:(1-p.x)*canvas.width,y:p.y*canvas.height}}
+
+/* ── DRAW GHOST ── */
+function drawGhost(){
+  if(!showGhost)return;
+  ctx.save();
+  const c='rgba(0,200,255,0.20)';
+  ctx.strokeStyle=c;ctx.fillStyle='rgba(0,220,255,0.25)';ctx.lineWidth=3;ctx.lineCap='round';ctx.setLineDash([5,8]);
+  for(const[a,b]of GBONES){
+    const pa=gC(G[a]),pb=gC(G[b]);
+    ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for(const k of Object.keys(G)){const p=gC(G[k]);ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill()}
+  const n=gC(G.nose);
+  ctx.beginPath();ctx.arc(n.x,n.y-18,18,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.stroke();
+  ctx.restore();
+}
+
+/* ── DRAW SKELETON ── */
+const PBONES=[[0,11],[0,12],[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+function drawSkeleton(lm,color){
+  ctx.save();
+  ctx.shadowBlur=18;ctx.shadowColor=color;ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=6;ctx.lineCap='round';
+  for(const[ai,bi]of PBONES){
+    if((lm[ai]?.visibility??1)<0.4||(lm[bi]?.visibility??1)<0.4)continue;
+    const pa=lC(lm[ai]),pb=lC(lm[bi]);ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();
+  }
+  for(const l of lm){if((l.visibility??1)<0.4)continue;const p=lC(l);ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);ctx.fill()}
+  const nose=lm[0];
+  if((nose.visibility??1)>=0.4){
+    const p=lC(nose);
+    ctx.beginPath();ctx.arc(p.x,p.y-22,24,0,Math.PI*2);ctx.lineWidth=6;ctx.stroke();
+    ctx.globalAlpha=0.15;ctx.beginPath();ctx.arc(p.x,p.y-22,22,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+/* ── RESULT HANDLER ── */
+function onResults(results){
+  const CW=canvas.width,CH=canvas.height;
+  ctx.clearRect(0,0,CW,CH);
+  ctx.save();ctx.translate(CW,0);ctx.scale(-1,1);
+  ctx.globalAlpha=focusMode?0.22:0.80;
+  ctx.drawImage(results.image,0,0,CW,CH);
+  ctx.restore();
+  if(focusMode){ctx.fillStyle='rgba(3,13,24,0.35)';ctx.fillRect(0,0,CW,CH)}
+  drawGhost();
+
+  const np=document.getElementById('no-pose');
+  if(!results.poseLandmarks?.length){
+    np.style.opacity='1';updateScorePanel(null);holdFrames=0;
+    document.getElementById('hold-fill').style.width='0%';return;
+  }
+  np.style.opacity='0';
+
+  const lm=results.poseLandmarks;
+  const sc=computeScores(lm);
+  const color=auraColor(sc.total);
+
+  drawSkeleton(lm,color);
+  if(!completed)drawHighlight(lm,currentStep);
+  updateScorePanel(sc);
+
+  if(!completed&&currentStep<STEPS.length){
+    const step=STEPS[currentStep];
+    const result=step.check(lm);
+
+    if(result.pass){
+      holdFrames=Math.min(holdFrames+1,step.holdNeeded);
+    } else {
+      holdFrames=Math.max(0,holdFrames-1);
+      if(holdFrames===0)maybeCorrect(step.corrective);
+    }
+
+    const pct=(holdFrames/step.holdNeeded)*100;
+    const hf=document.getElementById('hold-fill');
+    hf.style.width=pct+'%';
+    hf.style.background=pct>70?'#00ff88':pct>35?'#ff8c00':'#00e5ff';
+
+    if(holdFrames>=step.holdNeeded){
+      holdFrames=0;
+      if(step.voiceAdvance)speak(step.voiceAdvance,true);
+      if(currentStep<STEPS.length-1){
+        currentStep++;
+        updateStepCard(currentStep);
+        updateBubbles();
+        setTimeout(()=>speak(STEPS[currentStep].voice,true),2200);
+      } else {
+        completed=true;
+        document.getElementById('step-card').style.display='none';
+        document.getElementById('complete-card').style.display='block';
+        updateBubbles();
+      }
+    }
+  }
+}
+
+/* ── INIT ── */
+buildBubbles();
+updateStepCard(0);
+
+const mpTimeout=setTimeout(()=>{
+  if(typeof Pose==='undefined'){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('error-box').style.display='flex';
+    document.getElementById('err-msg').textContent='MediaPipe failed to load. Check internet connection.';
+  }
+},8000);
+
+const pose=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+pose.setOptions({modelComplexity:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+pose.onResults(onResults);
+
+const camera=new Camera(video,{
+  onFrame:async()=>{await pose.send({image:video})},
+  width:1280,height:720,
+});
+
+document.getElementById('load-msg').textContent='Requesting camera...';
+camera.start().then(()=>{
+  clearTimeout(mpTimeout);
+  setTimeout(()=>{
+    const ov=document.getElementById('loading');ov.style.opacity='0';
+    setTimeout(()=>{ov.style.display='none'},650);
+    setTimeout(()=>speak(STEPS[0].voice,true),800);
+  },700);
+}).catch(err=>{
+  clearTimeout(mpTimeout);
+  document.getElementById('loading').style.display='none';
+  document.getElementById('error-box').style.display='flex';
+  document.getElementById('err-msg').textContent='Camera error: '+(err.message||'Permission denied.');
+});
+</script>
+</body>
+</html>
